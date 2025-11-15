@@ -12,26 +12,45 @@ docloom = "0.1.0"
 ## Usage
 
 ```rust
-use docloom::{markdown, terminal};
+use docloom::{md, term};
 use docloom::prelude::*;
 
-let doc = vec![
-    h1("Title"),
-    p("A paragraph with some text."),
-    ul([
-        p("First item"),
-        p("Second item"),
-    ]),
-    code_block(Some("rust".into()), "let x = 42;"),
-];
+let content = vec![
+     h1("Docloom Overview"),
+     p((bold("Docloom"), " turns structured blocks into Markdown.")),
+     h2("Getting Started"),
+     p((
+         "Compose ",
+         italic("inline styles"),
+         " and render them together.",
+     )),
+     code_block("rust", "fn main() { println!(\"hello\"); }"),
+     h2("Lists"),
+     ul(["Supports bullet lists", "And numbered ones"]),
+     ol(["Call `doc`", "Render the output"]),
+     task_list([
+         (true, p("Choose block types")),
+         (false, p("Render to more targets")),
+     ]),
+     h2("Tables"),
+     table(
+         ("Feature", "Description"),
+         (
+             ("Tables", "Markdown alignment helpers"),
+             ("Task lists", "Checkbox formatting"),
+         ),
+     ),
+     h2("Quotes"),
+     quote(p("Render nested content with ease.")),
+     hr(),
+     p("Generate complete documents without manual Markdown stitching."),
+ ];
 
 // Render to markdown
-let md = markdown::Renderer::to_string(&doc[..]);
-println!("{}", md);
+println!("{}", md::doc(&doc));
 
 // Render to terminal with colors
-let term = terminal::Renderer::to_string(&doc[..]);
-println!("{}", term);
+println!("{}", term::doc(&doc));
 ```
 
 ## Document Structure

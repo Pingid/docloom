@@ -1,13 +1,76 @@
+//! Markdown renderer and supporting types.
+//!
+//! The `md` module turns [`crate::Block`] and [`crate::Inline`]
+//! structures into Markdown text with customizable styling.
+//!
+//! # Examples
+//! ```rust
+//! use docloom::md::{FenceStyle, ListMarker, Style, doc};
+//! use docloom::prelude::*;
+//!
+//! // Optional style configuration
+//! let style = Style {
+//!     code_fence: FenceStyle::Tilde,
+//!     list_marker: ListMarker::Asterisk,
+//!     max_heading: 3,
+//! };
+//!
+//! let rendered = doc([
+//!     h1("Docloom"),
+//!     p("Render Markdown from structured blocks."),
+//!     ul(["Configure Markdown output.", "Render it anywhere."]),
+//! ])
+//! .with_style(style)
+//! .to_string();
+//! ```
+
 use std::fmt;
 
-use crate::Alignment;
-
 use super::{Block, Inline, Render, Renderable};
+use crate::{Alignment, into_vec::ToVec};
 
+/// Markdown document wrapper that renders blocks with a [`Style`].
+pub struct Doc {
+    content: Vec<Block>,
+    style: Style,
+}
+
+impl Doc {
+    /// Create a new document from items convertible to [`Block`].
+    pub fn new(value: impl ToVec<Block>) -> Self {
+        Self {
+            content: value.to_vec(),
+            style: Style::default(),
+        }
+    }
+
+    /// Override the rendering style to use when formatting the document.
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
+        self
+    }
+}
+
+impl fmt::Display for Doc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.content
+            .render_with(&mut Renderer::with_style(f, self.style))
+    }
+}
+
+/// Construct a [`Doc`] from any value that can become a sequence of blocks.
+pub fn doc(value: impl ToVec<Block>) -> Doc {
+    Doc::new(value)
+}
+
+/// Configuration values that affect Markdown output.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Style {
+    /// Fence style to use when rendering code blocks.
     pub code_fence: FenceStyle,
+    /// Bullet marker to use for unordered lists.
     pub list_marker: ListMarker,
+    /// Maximum heading level emitted when rendering blocks.
     pub max_heading: u8,
 }
 
@@ -21,34 +84,52 @@ impl Default for Style {
     }
 }
 
+/// Fence marker options for code blocks.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FenceStyle {
+    /// Render code blocks using backtick fences.
     Backtick,
+    /// Render code blocks using tilde fences.
     Tilde,
 }
 
+/// Marker options for unordered lists.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ListMarker {
+    /// Use `*` for unordered list items.
     Asterisk,
+    /// Use `-` for unordered list items.
     Dash,
 }
 
+/// Renderer that writes Markdown to any [`fmt::Write`] target.
 pub struct Renderer<'a, W> {
     writer: &'a mut W,
     style: Style,
 }
 
 impl<'a, W> Renderer<'a, W> {
+    /// Create a renderer that writes to `writer` with the default [`Style`].
     pub fn new(writer: &'a mut W) -> Self {
         Self::with_style(writer, Style::default())
     }
 
+    /// Create a renderer with a custom [`Style`].
     pub fn with_style(writer: &'a mut W, style: Style) -> Self {
         Self { writer, style }
+    }
+
+    /// Render an arbitrary [`crate::Renderable`] value to the writer.
+    pub fn render<R>(&mut self, r: &R) -> Result<(), fmt::Error>
+    where
+        R: for<'b> Renderable<Renderer<'b, W>, Output = Result<(), fmt::Error>> + ?Sized,
+    {
+        r.render_with(self)
     }
 }
 
 impl Renderer<'_, String> {
+    /// Render a value to a [`String`] using the default [`Style`].
     pub fn to_string<R>(r: &R) -> String
     where
         R: for<'b> Renderable<Renderer<'b, String>, Output = Result<(), fmt::Error>> + ?Sized,
@@ -56,20 +137,37 @@ impl Renderer<'_, String> {
         Self::to_string_with_style(r, Style::default())
     }
 
+    /// Render a value to a [`String`] using the default style, returning errors.
+    pub fn try_to_string<R>(r: &R) -> Result<String, fmt::Error>
+    where
+        R: for<'b> Renderable<Renderer<'b, String>, Output = Result<(), fmt::Error>> + ?Sized,
+    {
+        Self::try_to_string_with_style(r, Style::default())
+    }
+
+    /// Render a value to a [`String`] with a custom [`Style`].
     pub fn to_string_with_style<R>(r: &R, style: Style) -> String
     where
         R: for<'b> Renderable<Renderer<'b, String>, Output = Result<(), fmt::Error>> + ?Sized,
     {
+        Self::try_to_string_with_style(r, style).unwrap()
+    }
+
+    /// Render a value to a [`String`] with a custom [`Style`], returning errors.
+    pub fn try_to_string_with_style<R>(r: &R, style: Style) -> Result<String, fmt::Error>
+    where
+        R: for<'b> Renderable<Renderer<'b, String>, Output = Result<(), fmt::Error>> + ?Sized,
+    {
         let mut buf = String::new();
-        r.render_with(&mut Renderer::with_style(&mut buf, style))
-            .unwrap();
-        buf
+        r.render_with(&mut Renderer::with_style(&mut buf, style))?;
+        Ok(buf)
     }
 }
 
 impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
     type Output = Result<(), fmt::Error>;
 
+    /// Render a [`crate::Block`] into Markdown.
     fn render_block(&mut self, inner: &Block) -> Self::Output {
         use Block::*;
         match inner {
@@ -226,6 +324,7 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
         }
     }
 
+    /// Render an [`crate::Inline`] into Markdown.
     fn render_inline(&mut self, inner: &Inline) -> fmt::Result {
         use Inline::*;
         match inner {
