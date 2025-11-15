@@ -1,173 +1,233 @@
-pub struct DocBuild {
-    blocks: Vec<crate::Block>,
+use std::fmt;
+
+use crate::into_vec::{ToRows, ToVec};
+use crate::{Alignment, Block, Inline};
+
+pub fn block(value: impl ToVec<Block>) -> Block {
+    Block::BlockList(value.to_vec())
 }
 
-impl DocBuild {
-    pub fn new() -> Self {
-        Self { blocks: vec![] }
-    }
+pub fn p(value: impl ToVec<Inline>) -> Block {
+    Block::Paragraph(value.to_vec())
+}
 
-    pub fn h1(mut self, text: impl Into<crate::Inline>) -> Self {
-        self.blocks.push(crate::Block::Heading {
-            level: 1,
-            content: vec![text.into()],
-        });
-        self
-    }
-
-    pub fn h2(mut self, text: impl Into<crate::Inline>) -> Self {
-        self.blocks.push(crate::Block::Heading {
-            level: 2,
-            content: vec![text.into()],
-        });
-        self
-    }
-
-    pub fn p(mut self, f: impl FnOnce(InlineBuild) -> InlineBuild) -> Self {
-        let builder = InlineBuild::new();
-        let content = f(builder).build();
-        self.blocks.push(crate::Block::Paragraph(content));
-        self
-    }
-
-    pub fn code(mut self, lang: impl Into<String>, content: impl Into<String>) -> Self {
-        self.blocks.push(crate::Block::CodeBlock {
-            language: Some(lang.into()),
-            content: content.into(),
-        });
-        self
-    }
-
-    pub fn ul(mut self, f: impl FnOnce(ListBuild) -> ListBuild) -> Self {
-        let builder = ListBuild::new();
-        let items = f(builder).build();
-        self.blocks.push(crate::Block::List {
-            ordered: false,
-            items,
-        });
-        self
-    }
-
-    pub fn hr(mut self) -> Self {
-        self.blocks.push(crate::Block::HorizontalRule);
-        self
-    }
-
-    pub fn build(self) -> Vec<crate::Block> {
-        self.blocks
+pub fn h(level: u8, value: impl ToVec<Inline>) -> Block {
+    Block::Heading {
+        level,
+        content: value.to_vec(),
     }
 }
 
-pub struct InlineBuild {
-    inlines: Vec<crate::Inline>,
+pub fn h1(value: impl ToVec<Inline>) -> Block {
+    h(1, value)
 }
 
-impl InlineBuild {
-    pub fn new() -> Self {
-        Self { inlines: vec![] }
-    }
+pub fn h2(value: impl ToVec<Inline>) -> Block {
+    h(2, value)
+}
 
-    pub fn text(mut self, text: impl Into<crate::Inline>) -> Self {
-        self.inlines.push(text.into());
-        self
-    }
+pub fn h3(value: impl ToVec<Inline>) -> Block {
+    h(3, value)
+}
 
-    pub fn bold(mut self, text: impl Into<crate::Inline>) -> Self {
-        self.inlines.push(crate::Inline::Bold(vec![text.into()]));
-        self
-    }
+pub fn h4(value: impl ToVec<Inline>) -> Block {
+    h(4, value)
+}
 
-    pub fn italic(mut self, text: impl Into<crate::Inline>) -> Self {
-        self.inlines.push(crate::Inline::Italic(vec![text.into()]));
-        self
-    }
+pub fn h5(value: impl ToVec<Inline>) -> Block {
+    h(5, value)
+}
 
-    pub fn code(mut self, text: impl Into<String>) -> Self {
-        self.inlines.push(crate::Inline::Code(text.into()));
-        self
-    }
+pub fn h6(value: impl ToVec<Inline>) -> Block {
+    h(6, value)
+}
 
-    pub fn link(mut self, text: impl Into<crate::Inline>, url: impl Into<String>) -> Self {
-        self.inlines.push(crate::Inline::Link {
-            text: vec![text.into()],
-            url: url.into(),
-        });
-        self
-    }
-
-    pub fn build(self) -> Vec<crate::Inline> {
-        self.inlines
+pub fn code_block(language: Option<String>, value: impl Into<String>) -> Block {
+    Block::CodeBlock {
+        language: language.into(),
+        content: value.into(),
     }
 }
 
-pub struct ListBuild {
-    items: Vec<crate::Block>,
-}
-
-impl ListBuild {
-    pub fn new() -> Self {
-        Self { items: vec![] }
-    }
-
-    pub fn item(mut self, f: impl FnOnce(InlineBuild) -> InlineBuild) -> Self {
-        let builder = InlineBuild::new();
-        let content = f(builder).build();
-        self.items.push(crate::Block::Paragraph(content));
-        self
-    }
-
-    pub fn build(self) -> Vec<crate::Block> {
-        self.items
+pub fn list(ordered: bool, items: impl ToVec<Block>) -> Block {
+    Block::List {
+        ordered,
+        items: items.to_vec().into(),
     }
 }
 
-pub struct TableBuild {
-    headers: Vec<crate::Inline>,
-    rows: Vec<Vec<crate::Inline>>,
-    alignments: Vec<crate::Alignment>,
+pub fn ul(items: impl ToVec<Block>) -> Block {
+    list(false, items)
 }
 
-impl TableBuild {
-    pub fn new() -> Self {
-        Self {
-            headers: vec![],
-            rows: vec![],
-            alignments: vec![],
-        }
-    }
+pub fn ol(items: impl ToVec<Block>) -> Block {
+    list(true, items)
+}
 
-    pub fn header(mut self, header: impl Into<crate::Inline>) -> Self {
-        self.headers.push(header.into());
-        self
-    }
-
-    pub fn row(mut self, row: impl Into<Vec<crate::Inline>>) -> Self {
-        self.rows.push(row.into());
-        self
-    }
-
-    pub fn alignment(mut self, alignment: crate::Alignment) -> Self {
-        self.alignments.push(alignment);
-        self
-    }
-
-    pub fn column(
-        mut self,
-        header: impl Into<crate::Inline>,
-        alignment: crate::Alignment,
-        cells: impl Into<Vec<crate::Inline>>,
-    ) -> Self {
-        self.headers.push(header.into());
-        self.alignments.push(alignment);
-        self.rows.push(cells.into());
-        self
-    }
-
-    pub fn build(self) -> crate::Block {
-        crate::Block::Table {
-            headers: self.headers,
-            rows: self.rows,
-            alignments: self.alignments,
-        }
+pub fn task_list(items: impl ToVec<(bool, Block)>) -> Block {
+    Block::TaskList {
+        items: items
+            .to_vec()
+            .into_iter()
+            .map(|(checked, item)| (checked, item))
+            .collect(),
     }
 }
+
+pub fn table(headers: impl ToVec<Inline>, rows: impl ToRows<Inline>) -> Block {
+    let headers: Vec<Inline> = headers.to_vec();
+    let alignments = vec![Alignment::Left; headers.len()];
+    Block::Table {
+        headers,
+        rows: rows.to_rows(),
+        alignments,
+    }
+}
+
+pub fn table_aligned(
+    headers: impl ToVec<Inline>,
+    rows: impl ToRows<Inline>,
+    alignments: impl Into<Vec<Alignment>>,
+) -> Block {
+    Block::Table {
+        headers: headers.to_vec(),
+        rows: rows.to_rows(),
+        alignments: alignments.into().into(),
+    }
+}
+
+pub fn hr() -> Block {
+    Block::HorizontalRule
+}
+
+pub fn quote(value: impl ToVec<Block>) -> Block {
+    Block::Blockquote(value.to_vec())
+}
+
+pub fn text(value: impl fmt::Display) -> Inline {
+    Inline::Text(value.to_string())
+}
+
+pub fn bold(value: impl ToVec<Inline>) -> Inline {
+    Inline::Bold(value.to_vec())
+}
+
+pub fn italic(value: impl ToVec<Inline>) -> Inline {
+    Inline::Italic(value.to_vec())
+}
+
+pub fn strikethrough(value: impl ToVec<Inline>) -> Inline {
+    Inline::Strikethrough(value.to_vec())
+}
+
+pub fn code(value: impl Into<String>) -> Inline {
+    Inline::Code(value.into())
+}
+
+pub fn link(text: impl ToVec<Inline>, url: impl Into<String>) -> Inline {
+    Inline::Link {
+        text: text.to_vec(),
+        url: url.into(),
+    }
+}
+
+// ---------------- Block Trait impls ----------------
+impl<T> From<T> for Block
+where
+    T: Into<Inline>,
+{
+    fn from(value: T) -> Self {
+        Block::Paragraph(vec![value.into()])
+    }
+}
+
+impl ToVec<Block> for Block {
+    fn to_vec(self) -> Vec<Block> {
+        vec![self]
+    }
+}
+
+impl<'a> ToVec<Block> for &'a Block {
+    fn to_vec(self) -> Vec<Block> {
+        vec![self.clone()]
+    }
+}
+
+// ---------------- Inline Trait impls ----------------
+impl<T> From<T> for Inline
+where
+    T: std::fmt::Display,
+{
+    fn from(value: T) -> Self {
+        Inline::Text(value.to_string())
+    }
+}
+
+impl ToVec<Inline> for Inline {
+    fn to_vec(self) -> Vec<Inline> {
+        vec![self]
+    }
+}
+
+impl<'a> ToVec<Inline> for &'a str {
+    fn to_vec(self) -> Vec<Inline> {
+        vec![Inline::from(self)]
+    }
+}
+
+impl ToVec<Inline> for String {
+    fn to_vec(self) -> Vec<Inline> {
+        vec![Inline::from(self)]
+    }
+}
+
+// ---------------- Extension Traits ----------------
+
+/// Extension trait for creating block elements with method syntax
+pub trait BlockExt: Sized + ToVec<Inline> {
+    fn h1(self) -> Block {
+        h1(self)
+    }
+
+    fn h2(self) -> Block {
+        h2(self)
+    }
+
+    fn h3(self) -> Block {
+        h3(self)
+    }
+
+    fn h4(self) -> Block {
+        h4(self)
+    }
+
+    fn h5(self) -> Block {
+        h5(self)
+    }
+
+    fn h6(self) -> Block {
+        h6(self)
+    }
+
+    fn p(self) -> Block {
+        p(self)
+    }
+}
+impl<T: ToVec<Inline>> BlockExt for T {}
+
+/// Extension trait for creating inline elements with method syntax
+pub trait InlineExt: Sized + ToVec<Inline> {
+    fn bold(self) -> Inline {
+        bold(self)
+    }
+    fn italic(self) -> Inline {
+        italic(self)
+    }
+    fn strikethrough(self) -> Inline {
+        strikethrough(self)
+    }
+    fn link(self, url: impl Into<String>) -> Inline {
+        link(self, url)
+    }
+}
+impl<T: ToVec<Inline>> InlineExt for T {}

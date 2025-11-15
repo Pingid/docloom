@@ -1,9 +1,12 @@
-pub mod build;
-mod macros;
+mod build;
+pub(crate) mod into_vec;
+
 pub mod markdown;
 pub mod terminal;
 
-pub use build::*;
+pub mod prelude {
+    pub use crate::build::*;
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Block {
@@ -16,32 +19,25 @@ pub enum Block {
         language: Option<String>,
         content: String,
     },
+    Blockquote(Vec<Block>),
     List {
         ordered: bool,
         items: Vec<Block>,
+    },
+    TaskList {
+        items: Vec<(bool, Block)>,
     },
     Table {
         headers: Vec<Inline>,
         rows: Vec<Vec<Inline>>,
         alignments: Vec<Alignment>,
     },
+    Image {
+        alt: String,
+        url: String,
+    },
     HorizontalRule,
-}
-
-impl<T> From<T> for Block
-where
-    T: Into<Inline>,
-{
-    fn from(value: T) -> Self {
-        Block::Paragraph(vec![value.into()]).into()
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Alignment {
-    Left,
-    Center,
-    Right,
+    BlockList(Vec<Block>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -49,17 +45,18 @@ pub enum Inline {
     Text(String),
     Bold(Vec<Inline>),
     Italic(Vec<Inline>),
+    Strikethrough(Vec<Inline>),
     Code(String),
     Link { text: Vec<Inline>, url: String },
+    Image { alt: String, url: String },
+    LineBreak,
 }
 
-impl<T> From<T> for Inline
-where
-    T: Into<String>,
-{
-    fn from(value: T) -> Self {
-        Inline::Text(value.into())
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Alignment {
+    Left,
+    Center,
+    Right,
 }
 
 pub trait Render {
