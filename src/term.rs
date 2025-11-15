@@ -1,60 +1,92 @@
+//! Terminal renderer with ANSI color support.
+//!
+//! The `term` module renders [`crate::Block`] trees into strings that
+//! include indentation, Unicode box drawing, and configurable ANSI styling.
+//!
+//! # Examples
+//! ```rust
+//! use docloom::prelude::*;
+//! use docloom::term::{Style, doc};
+//!
+//! // Optional style configuration
+//! let style = Style::plain()
+//!     .unicode_boxes(false)
+//!     .colors(false)
+//!     .heading_colors([
+//!         Style::BRIGHT_CYAN,
+//!         Style::CYAN,
+//!         Style::BRIGHT_BLUE,
+//!         Style::BLUE,
+//!         Style::BRIGHT_WHITE,
+//!         Style::BRIGHT_WHITE,
+//!     ]);
+//!
+//! let rendered = doc([
+//!     h1("Terminal Output"),
+//!     p("Render ANSI-enhanced text from structured blocks."),
+//! ])
+//! .with_style(style)
+//! .to_string();
+//! ```
+
 use std::fmt;
 
 use super::{Block, Inline, Render, Renderable};
+use crate::into_vec::ToVec;
 
-/// Configuration for terminal rendering style
-#[derive(Clone)]
-pub struct Style {
-    pub use_colors: bool,
-    pub use_unicode_boxes: bool,
-    pub heading_colors: [&'static str; 6],
-    pub code_color: &'static str,
-    pub code_bg: &'static str,
-    pub link_color: &'static str,
-    pub list_color: &'static str,
-    pub border_color: &'static str,
+/// Terminal document wrapper that renders blocks with terminal [`Style`].
+pub struct Doc {
+    content: Vec<Block>,
+    style: Style,
 }
 
-impl Style {
-    pub fn colors(mut self, use_colors: bool) -> Self {
-        self.use_colors = use_colors;
-        self
+impl Doc {
+    /// Create a document from values convertible to [`Block`].
+    pub fn new(value: impl ToVec<Block>) -> Self {
+        Self {
+            content: value.to_vec(),
+            style: Style::default(),
+        }
     }
 
-    pub fn unicode_boxes(mut self, use_unicode_boxes: bool) -> Self {
-        self.use_unicode_boxes = use_unicode_boxes;
+    /// Override the rendering style to use when formatting the document.
+    pub fn with_style(mut self, style: Style) -> Self {
+        self.style = style;
         self
     }
+}
 
-    pub fn heading_colors(mut self, heading_colors: [&'static str; 6]) -> Self {
-        self.heading_colors = heading_colors;
-        self
+impl fmt::Display for Doc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.content
+            .render_with(&mut Renderer::with_style(f, self.style))
     }
+}
 
-    pub fn code_color(mut self, code_color: &'static str) -> Self {
-        self.code_color = code_color;
-        self
-    }
+/// Construct a [`Doc`] from any value that can become a sequence of blocks.
+pub fn doc(value: impl ToVec<Block>) -> Doc {
+    Doc::new(value)
+}
 
-    pub fn code_bg(mut self, code_bg: &'static str) -> Self {
-        self.code_bg = code_bg;
-        self
-    }
-
-    pub fn link_color(mut self, link_color: &'static str) -> Self {
-        self.link_color = link_color;
-        self
-    }
-
-    pub fn list_color(mut self, list_color: &'static str) -> Self {
-        self.list_color = list_color;
-        self
-    }
-
-    pub fn border_color(mut self, border_color: &'static str) -> Self {
-        self.border_color = border_color;
-        self
-    }
+/// Configuration for terminal rendering style.
+#[derive(Clone, Copy)]
+pub struct Style {
+    /// Whether to emit ANSI color escape codes.
+    pub use_colors: bool,
+    /// Whether to rely on Unicode box drawing characters.
+    pub use_unicode_boxes: bool,
+    /// Colors to cycle through for heading levels.
+    pub heading_colors: [&'static str; 6],
+    /// Foreground color used for code blocks.
+    pub code_color: &'static str,
+    /// Background color used for code blocks.
+    pub code_bg: &'static str,
+    /// Color used for rendering hyperlinks.
+    pub link_color: &'static str,
+    /// Color used for list markers.
+    pub list_color: &'static str,
+    /// Color used for borders such as code block boxes.
+    pub border_color: &'static str,
 }
 
 impl Default for Style {
@@ -80,25 +112,88 @@ impl Default for Style {
 }
 
 impl Style {
+    /// ANSI escape code for a black foreground.
+    pub const BLACK: &str = "\x1b[30m";
+    /// ANSI escape code for a red foreground.
+    pub const RED: &str = "\x1b[31m";
+    /// ANSI escape code for a green foreground.
+    pub const GREEN: &str = "\x1b[32m";
+    /// ANSI escape code for a yellow foreground.
+    pub const YELLOW: &str = "\x1b[33m";
+    /// ANSI escape code for a blue foreground.
+    pub const BLUE: &str = "\x1b[34m";
+    /// ANSI escape code for a magenta foreground.
+    pub const MAGENTA: &str = "\x1b[35m";
+    /// ANSI escape code for a cyan foreground.
+    pub const CYAN: &str = "\x1b[36m";
+    /// ANSI escape code for a white foreground.
+    pub const WHITE: &str = "\x1b[37m";
+
+    /// ANSI escape code for a bright black foreground.
+    pub const BRIGHT_BLACK: &str = "\x1b[90m";
+    /// ANSI escape code for a bright red foreground.
+    pub const BRIGHT_RED: &str = "\x1b[91m";
+    /// ANSI escape code for a bright green foreground.
+    pub const BRIGHT_GREEN: &str = "\x1b[92m";
+    /// ANSI escape code for a bright yellow foreground.
+    pub const BRIGHT_YELLOW: &str = "\x1b[93m";
+    /// ANSI escape code for a bright blue foreground.
+    pub const BRIGHT_BLUE: &str = "\x1b[94m";
+    /// ANSI escape code for a bright magenta foreground.
+    pub const BRIGHT_MAGENTA: &str = "\x1b[95m";
+    /// ANSI escape code for a bright cyan foreground.
+    pub const BRIGHT_CYAN: &str = "\x1b[96m";
+    /// ANSI escape code for a bright white foreground.
+    pub const BRIGHT_WHITE: &str = "\x1b[97m";
+
+    /// ANSI escape code for a black background.
+    pub const BG_BLACK: &str = "\x1b[40m";
+    /// ANSI escape code for a red background.
+    pub const BG_RED: &str = "\x1b[41m";
+    /// ANSI escape code for a green background.
+    pub const BG_GREEN: &str = "\x1b[42m";
+    /// ANSI escape code for a yellow background.
+    pub const BG_YELLOW: &str = "\x1b[43m";
+    /// ANSI escape code for a blue background.
+    pub const BG_BLUE: &str = "\x1b[44m";
+    /// ANSI escape code for a magenta background.
+    pub const BG_MAGENTA: &str = "\x1b[45m";
+    /// ANSI escape code for a cyan background.
+    pub const BG_CYAN: &str = "\x1b[46m";
+    /// ANSI escape code for a white background.
+    pub const BG_WHITE: &str = "\x1b[47m";
+
+    /// ANSI escape code for a bright black background.
+    pub const BG_BRIGHT_BLACK: &str = "\x1b[100m";
+    /// ANSI escape code for a bright red background.
+    pub const BG_BRIGHT_RED: &str = "\x1b[101m";
+    /// ANSI escape code for a bright green background.
+    pub const BG_BRIGHT_GREEN: &str = "\x1b[102m";
+    /// ANSI escape code for a bright yellow background.
+    pub const BG_BRIGHT_YELLOW: &str = "\x1b[103m";
+    /// ANSI escape code for a bright blue background.
+    pub const BG_BRIGHT_BLUE: &str = "\x1b[104m";
+    /// ANSI escape code for a bright magenta background.
+    pub const BG_BRIGHT_MAGENTA: &str = "\x1b[105m";
+    /// ANSI escape code for a bright cyan background.
+    pub const BG_BRIGHT_CYAN: &str = "\x1b[106m";
+    /// ANSI escape code for a bright white background.
+    pub const BG_BRIGHT_WHITE: &str = "\x1b[107m";
+
+    /// ANSI escape code to reset all text attributes.
     pub const RESET: &str = "\x1b[0m";
+    /// ANSI escape code to enable bold text.
     pub const BOLD: &str = "\x1b[1m";
+    /// ANSI escape code to dim text.
     pub const DIM: &str = "\x1b[2m";
+    /// ANSI escape code to italicize text.
     pub const ITALIC: &str = "\x1b[3m";
+    /// ANSI escape code to underline text.
     pub const UNDERLINE: &str = "\x1b[4m";
+    /// ANSI escape code to strike through text.
     pub const STRIKETHROUGH: &str = "\x1b[9m";
 
-    pub const BRIGHT_BLACK: &str = "\x1b[90m";
-    pub const BRIGHT_CYAN: &str = "\x1b[96m";
-    pub const CYAN: &str = "\x1b[36m";
-    pub const BRIGHT_BLUE: &str = "\x1b[94m";
-    pub const BLUE: &str = "\x1b[34m";
-    pub const BRIGHT_WHITE: &str = "\x1b[97m";
-    pub const GREEN: &str = "\x1b[32m";
-    pub const BRIGHT_GREEN: &str = "\x1b[92m";
-    pub const BRIGHT_YELLOW: &str = "\x1b[93m";
-    pub const BG_BLACK: &str = "\x1b[40m";
-
-    /// Create a style with no colors (plain text)
+    /// Create a style with no colors (plain text).
     pub fn plain() -> Self {
         Self {
             use_colors: false,
@@ -106,12 +201,60 @@ impl Style {
         }
     }
 
-    /// Create a style without unicode box-drawing characters
+    /// Create a style without Unicode box-drawing characters.
     pub fn ascii() -> Self {
         Self {
             use_unicode_boxes: false,
             ..Default::default()
         }
+    }
+
+    /// Enable or disable ANSI colors.
+    pub fn colors(mut self, use_colors: bool) -> Self {
+        self.use_colors = use_colors;
+        self
+    }
+
+    /// Enable or disable Unicode box-drawing characters.
+    pub fn unicode_boxes(mut self, use_unicode_boxes: bool) -> Self {
+        self.use_unicode_boxes = use_unicode_boxes;
+        self
+    }
+
+    /// Override the set of heading colors.
+    pub fn heading_colors(mut self, heading_colors: [&'static str; 6]) -> Self {
+        self.heading_colors = heading_colors;
+        self
+    }
+
+    /// Set the code foreground color.
+    pub fn code_color(mut self, code_color: &'static str) -> Self {
+        self.code_color = code_color;
+        self
+    }
+
+    /// Set the code background color.
+    pub fn code_bg(mut self, code_bg: &'static str) -> Self {
+        self.code_bg = code_bg;
+        self
+    }
+
+    /// Set the hyperlink color.
+    pub fn link_color(mut self, link_color: &'static str) -> Self {
+        self.link_color = link_color;
+        self
+    }
+
+    /// Set the list marker color.
+    pub fn list_color(mut self, list_color: &'static str) -> Self {
+        self.list_color = list_color;
+        self
+    }
+
+    /// Set the border color used for code blocks and tables.
+    pub fn border_color(mut self, border_color: &'static str) -> Self {
+        self.border_color = border_color;
+        self
     }
 }
 
@@ -122,10 +265,12 @@ pub struct Renderer<'a, W> {
 }
 
 impl<'a, W> Renderer<'a, W> {
+    /// Create a renderer with default [`Style`] settings.
     pub fn new(writer: &'a mut W) -> Self {
         Self::with_style(writer, Style::default())
     }
 
+    /// Create a renderer that uses a custom [`Style`].
     pub fn with_style(writer: &'a mut W, style: Style) -> Self {
         Self {
             writer,
@@ -147,6 +292,7 @@ impl<'a, W> Renderer<'a, W> {
 }
 
 impl Renderer<'_, String> {
+    /// Render a value to a [`String`] using the default [`Style`].
     pub fn to_string<R>(r: &R) -> String
     where
         R: for<'b> Renderable<Renderer<'b, String>, Output = Result<(), fmt::Error>> + ?Sized,
@@ -154,6 +300,7 @@ impl Renderer<'_, String> {
         Self::to_string_with_style(r, Style::default())
     }
 
+    /// Render a value to a [`String`] using a custom [`Style`].
     pub fn to_string_with_style<R>(r: &R, style: Style) -> String
     where
         R: for<'b> Renderable<Renderer<'b, String>, Output = Result<(), fmt::Error>> + ?Sized,
@@ -168,6 +315,7 @@ impl Renderer<'_, String> {
 impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
     type Output = Result<(), fmt::Error>;
 
+    /// Render a [`crate::Block`] as colored terminal output.
     fn render_block(&mut self, inner: &Block) -> Self::Output {
         use Block::*;
 
@@ -533,6 +681,7 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
         }
     }
 
+    /// Render an [`crate::Inline`] as colored terminal output.
     fn render_inline(&mut self, inner: &Inline) -> fmt::Result {
         use Inline::*;
 

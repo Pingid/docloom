@@ -14,6 +14,7 @@ macro_rules! impl_tuple_to_vec {
     };
 }
 
+/// Trait for converting values into owned vectors.
 pub trait ToVec<T> {
     fn to_vec(self) -> Vec<T>;
 }
@@ -68,6 +69,7 @@ impl_tuple_to_vec!(A, B, C, D, E, F, G, H, I, J, K, L);
 impl_tuple_to_vec!(A, B, C, D, E, F, G, H, I, J, K, L, M);
 impl_tuple_to_vec!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
 
+/// Implement the `ToVec` trait for a sequence of types by wrapping values in a `Vec`.
 #[macro_export]
 macro_rules! impl_to_vec {
     ($for:ident, $lifetime:lifetime $type:ty $(, $($rest:tt)*)?) => {
@@ -88,6 +90,7 @@ macro_rules! impl_to_vec {
     };
 }
 
+/// Convert values into rows of vectors for table helpers.
 pub trait ToRows<T> {
     fn to_rows(self) -> Vec<Vec<T>>;
 }
