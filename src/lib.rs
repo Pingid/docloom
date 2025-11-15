@@ -1,10 +1,11 @@
 mod build;
 pub(crate) mod into_vec;
 
-pub mod markdown;
-pub mod terminal;
+pub mod md;
+pub mod term;
 
 pub mod prelude {
+    pub use super::{Render, Renderable};
     pub use crate::build::*;
 }
 
