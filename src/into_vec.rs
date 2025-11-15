@@ -68,6 +68,26 @@ impl_tuple_to_vec!(A, B, C, D, E, F, G, H, I, J, K, L);
 impl_tuple_to_vec!(A, B, C, D, E, F, G, H, I, J, K, L, M);
 impl_tuple_to_vec!(A, B, C, D, E, F, G, H, I, J, K, L, M, N);
 
+#[macro_export]
+macro_rules! impl_to_vec {
+    ($for:ident, $lifetime:lifetime $type:ty $(, $($rest:tt)*)?) => {
+        impl<$lifetime> $crate::into_vec::ToVec<$for> for &$lifetime $type {
+            fn to_vec(self) -> Vec<$for> {
+                vec![self.clone().into()]
+            }
+        }
+        $($crate::impl_to_vec!($for, $($rest)*);)?
+    };
+    ($for:ident, $type:ty $(, $($rest:tt)*)?) => {
+        impl $crate::into_vec::ToVec<$for> for $type {
+            fn to_vec(self) -> Vec<$for> {
+                vec![self.into()]
+            }
+        }
+        $($crate::impl_to_vec!($for, $($rest)*);)?
+    };
+}
+
 pub trait ToRows<T> {
     fn to_rows(self) -> Vec<Vec<T>>;
 }
