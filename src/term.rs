@@ -15,6 +15,48 @@ pub struct Style {
     pub border_color: &'static str,
 }
 
+impl Style {
+    pub fn colors(mut self, use_colors: bool) -> Self {
+        self.use_colors = use_colors;
+        self
+    }
+
+    pub fn unicode_boxes(mut self, use_unicode_boxes: bool) -> Self {
+        self.use_unicode_boxes = use_unicode_boxes;
+        self
+    }
+
+    pub fn heading_colors(mut self, heading_colors: [&'static str; 6]) -> Self {
+        self.heading_colors = heading_colors;
+        self
+    }
+
+    pub fn code_color(mut self, code_color: &'static str) -> Self {
+        self.code_color = code_color;
+        self
+    }
+
+    pub fn code_bg(mut self, code_bg: &'static str) -> Self {
+        self.code_bg = code_bg;
+        self
+    }
+
+    pub fn link_color(mut self, link_color: &'static str) -> Self {
+        self.link_color = link_color;
+        self
+    }
+
+    pub fn list_color(mut self, list_color: &'static str) -> Self {
+        self.list_color = list_color;
+        self
+    }
+
+    pub fn border_color(mut self, border_color: &'static str) -> Self {
+        self.border_color = border_color;
+        self
+    }
+}
+
 impl Default for Style {
     fn default() -> Self {
         Self {
