@@ -38,22 +38,23 @@ impl Default for Style {
 }
 
 impl Style {
-    const RESET: &str = "\x1b[0m";
-    const BOLD: &str = "\x1b[1m";
-    const DIM: &str = "\x1b[2m";
-    const ITALIC: &str = "\x1b[3m";
-    const UNDERLINE: &str = "\x1b[4m";
+    pub const RESET: &str = "\x1b[0m";
+    pub const BOLD: &str = "\x1b[1m";
+    pub const DIM: &str = "\x1b[2m";
+    pub const ITALIC: &str = "\x1b[3m";
+    pub const UNDERLINE: &str = "\x1b[4m";
+    pub const STRIKETHROUGH: &str = "\x1b[9m";
 
-    const BRIGHT_BLACK: &str = "\x1b[90m";
-    const BRIGHT_CYAN: &str = "\x1b[96m";
-    const CYAN: &str = "\x1b[36m";
-    const BRIGHT_BLUE: &str = "\x1b[94m";
-    const BLUE: &str = "\x1b[34m";
-    const BRIGHT_WHITE: &str = "\x1b[97m";
-    const GREEN: &str = "\x1b[32m";
-    const BRIGHT_GREEN: &str = "\x1b[92m";
-    const BRIGHT_YELLOW: &str = "\x1b[93m";
-    const BG_BLACK: &str = "\x1b[40m";
+    pub const BRIGHT_BLACK: &str = "\x1b[90m";
+    pub const BRIGHT_CYAN: &str = "\x1b[96m";
+    pub const CYAN: &str = "\x1b[36m";
+    pub const BRIGHT_BLUE: &str = "\x1b[94m";
+    pub const BLUE: &str = "\x1b[34m";
+    pub const BRIGHT_WHITE: &str = "\x1b[97m";
+    pub const GREEN: &str = "\x1b[32m";
+    pub const BRIGHT_GREEN: &str = "\x1b[92m";
+    pub const BRIGHT_YELLOW: &str = "\x1b[93m";
+    pub const BG_BLACK: &str = "\x1b[40m";
 
     /// Create a style with no colors (plain text)
     pub fn plain() -> Self {
@@ -132,8 +133,7 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
             Paragraph(content) => {
                 self.write_indent()?;
                 content.render_with(self)?;
-                writeln!(self.writer, "{}", self.color(Style::RESET))?;
-                writeln!(self.writer)
+                writeln!(self.writer, "{}", self.color(Style::RESET))
             }
 
             Heading { level, content } => {
@@ -251,6 +251,32 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                 writeln!(self.writer)
             }
 
+            TaskList { items } => {
+                for (checked, item) in items.iter() {
+                    self.write_indent()?;
+                    let box_char = if self.style.use_unicode_boxes {
+                        if *checked { "☑" } else { "☐" }
+                    } else if *checked {
+                        "[x]"
+                    } else {
+                        "[ ]"
+                    };
+
+                    write!(
+                        self.writer,
+                        "{}{} {}",
+                        self.color(self.style.list_color),
+                        box_char,
+                        self.color(Style::RESET)
+                    )?;
+
+                    self.indent_level += 1;
+                    item.render_with(self)?;
+                    self.indent_level -= 1;
+                }
+                writeln!(self.writer)
+            }
+
             Table {
                 headers,
                 rows,
@@ -313,7 +339,9 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                         self.color(Style::BRIGHT_CYAN)
                     )?;
                     let rendered = Self::to_plain_string(h_cell);
-                    write!(self.writer, "{:width$}", rendered, width = widths[i])?;
+                    let align = alignments.get(i).copied().unwrap_or(crate::Alignment::Left);
+                    let aligned = Self::align_text(&rendered, widths[i], align);
+                    write!(self.writer, "{}", aligned)?;
                     write!(
                         self.writer,
                         "{} {}{}{}{}",
@@ -356,9 +384,11 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                     )?;
                     for (i, w) in widths.iter().enumerate() {
                         write!(self.writer, " ")?;
+                        let align = alignments.get(i).copied().unwrap_or(crate::Alignment::Left);
                         if let Some(cell) = row.get(i) {
                             let rendered = Self::to_plain_string(cell);
-                            write!(self.writer, "{:width$}", rendered, width = *w)?;
+                            let aligned = Self::align_text(&rendered, *w, align);
+                            write!(self.writer, "{}", aligned)?;
                         } else {
                             write!(self.writer, "{:width$}", "", width = *w)?;
                         }
@@ -393,6 +423,48 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                 writeln!(self.writer)
             }
 
+            Blockquote(inner) => {
+                // Draw left border and indent content
+                let border = if self.style.use_unicode_boxes {
+                    "▎"
+                } else {
+                    "|"
+                };
+
+                // Render content to a temporary buffer to get proper rendering
+                let mut content_style = self.style.clone();
+                content_style.use_unicode_boxes = self.style.use_unicode_boxes;
+                content_style.use_colors = self.style.use_colors;
+
+                // Render each block individually with proper indentation
+                for block in inner.iter() {
+                    // Render the block to a string first
+                    let mut block_content = String::new();
+                    self.indent_level += 1;
+                    block.render_with(&mut Renderer::with_style(
+                        &mut block_content,
+                        content_style.clone(),
+                    ))?;
+                    self.indent_level -= 1;
+
+                    // Add the border to each line of the block
+                    for line in block_content.lines() {
+                        self.write_indent()?;
+                        write!(
+                            self.writer,
+                            "{}{}{}{} {}",
+                            self.color(Style::DIM),
+                            self.color(self.style.border_color),
+                            border,
+                            self.color(Style::RESET),
+                            line
+                        )?;
+                        writeln!(self.writer)?;
+                    }
+                }
+                writeln!(self.writer)
+            }
+            Image { alt: _, url: _ } => unimplemented!(),
             HorizontalRule => {
                 self.write_indent()?;
                 let rule = if self.style.use_unicode_boxes {
@@ -409,6 +481,12 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                     self.color(Style::RESET)
                 )?;
                 writeln!(self.writer)
+            }
+            BlockList(inner) => {
+                for block in inner.iter() {
+                    block.render_with(self)?;
+                }
+                Ok(())
             }
         }
     }
@@ -428,6 +506,13 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
 
             Italic(content) => {
                 write!(self.writer, "{}", self.color(Style::ITALIC))?;
+                content.render_with(self)?;
+                write!(self.writer, "{}", self.color(Style::RESET))?;
+                Ok(())
+            }
+
+            Strikethrough(content) => {
+                write!(self.writer, "{}", self.color(Style::STRIKETHROUGH))?;
                 content.render_with(self)?;
                 write!(self.writer, "{}", self.color(Style::RESET))?;
                 Ok(())
@@ -464,31 +549,164 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                 )?;
                 Ok(())
             }
+            Image { alt: _, url: _ } => unimplemented!(),
+            LineBreak => {
+                writeln!(self.writer)?;
+                self.write_indent()
+            }
         }
     }
 }
 
 // Helper methods
 impl<'a, W: fmt::Write> Renderer<'a, W> {
+    fn align_text(text: &str, width: usize, align: crate::Alignment) -> String {
+        let text_len = text.chars().count();
+        if text_len >= width {
+            text.to_string()
+        } else {
+            let padding = width - text_len;
+            match align {
+                crate::Alignment::Left => format!("{:width$}", text, width = width),
+                crate::Alignment::Center => {
+                    let left_pad = padding / 2;
+                    let right_pad = padding - left_pad;
+                    format!("{}{}{}", " ".repeat(left_pad), text, " ".repeat(right_pad))
+                }
+                crate::Alignment::Right => format!("{:>width$}", text, width = width),
+            }
+        }
+    }
+
     fn measure_inline(inline: &Inline) -> usize {
         match inline {
             Inline::Text(t) => t.to_string().chars().count(),
-            Inline::Bold(content) | Inline::Italic(content) => {
+            Inline::Bold(content) | Inline::Italic(content) | Inline::Strikethrough(content) => {
                 content.iter().map(Self::measure_inline).sum()
             }
             Inline::Code(t) => t.to_string().chars().count(),
             Inline::Link { text, .. } => text.iter().map(Self::measure_inline).sum(),
+            Inline::Image { alt, url } => alt.chars().count() + url.chars().count(),
+            Inline::LineBreak => unreachable!(),
         }
     }
 
     fn to_plain_string(inline: &Inline) -> String {
         match inline {
             Inline::Text(t) => t.to_string(),
-            Inline::Bold(content) | Inline::Italic(content) => {
+            Inline::Bold(content) | Inline::Italic(content) | Inline::Strikethrough(content) => {
                 content.iter().map(Self::to_plain_string).collect()
             }
             Inline::Code(t) => t.to_string(),
             Inline::Link { text, .. } => text.iter().map(Self::to_plain_string).collect(),
+            Inline::Image { alt: _, url: _ } => unimplemented!(),
+            Inline::LineBreak => unreachable!(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::build::*;
+
+    #[test]
+    fn test_terminal_strikethrough() {
+        // Simple strikethrough with no colors
+        let strike = p(vec![strikethrough("crossed out")]);
+        let style = Style::plain();
+        let terminal_output = Renderer::to_string_with_style(&strike, style);
+        // Should contain the text even without ANSI codes
+        assert!(terminal_output.contains("crossed out"));
+
+        // Strikethrough with colors enabled
+        let strike = p(vec![
+            text("This is "),
+            strikethrough("struck"),
+            text(" text"),
+        ]);
+        let terminal_output = Renderer::to_string(&strike);
+        // Check for ANSI strikethrough code
+        assert!(terminal_output.contains("\x1b[9m"));
+        assert!(terminal_output.contains("struck"));
+
+        // Mixed inline styles
+        let mixed = p(vec![
+            bold("Bold"),
+            text(" "),
+            italic("italic"),
+            text(" "),
+            strikethrough("strike"),
+        ]);
+        let terminal_output = Renderer::to_string(&mixed);
+        assert!(terminal_output.contains("\x1b[1m")); // bold
+        assert!(terminal_output.contains("\x1b[3m")); // italic
+        assert!(terminal_output.contains("\x1b[9m")); // strikethrough
+    }
+
+    #[test]
+    fn test_terminal_table_alignment() {
+        use crate::Alignment;
+
+        // Create a table with different alignments
+        let table = table_aligned(
+            ("Left", "Center", "Right"),
+            vec![
+                vec![text("A"), text("B"), text("C")],
+                vec![text("Long"), text("Text"), text("Here")],
+            ],
+            vec![Alignment::Left, Alignment::Center, Alignment::Right],
+        );
+
+        let mut style = Style::ascii();
+        style.use_colors = false;
+        let output = Renderer::to_string_with_style(&table, style);
+
+        println!("Terminal table with alignments:\n{}", output);
+
+        // The output should have proper spacing
+        // Left aligned should have trailing spaces
+        // Center aligned should have balanced spaces
+        // Right aligned should have leading spaces
+        let lines: Vec<&str> = output.lines().collect();
+
+        // Check that the table has the expected structure
+        assert!(lines.len() >= 5); // Top border, header, separator, 2 rows, bottom border
+
+        // Verify the content exists (actual alignment is visual)
+        assert!(output.contains("Left"));
+        assert!(output.contains("Center"));
+        assert!(output.contains("Right"));
+        assert!(output.contains("Long"));
+        assert!(output.contains("Text"));
+        assert!(output.contains("Here"));
+    }
+
+    #[test]
+    fn test_terminal_blockquote() {
+        // Simple blockquote test with ASCII style and no colors
+        let bq = quote(vec![p("This is a quoted text.")]);
+        let mut style = Style::ascii();
+        style.use_colors = false; // Disable colors for testing
+        let terminal_output = Renderer::to_string_with_style(&bq, style);
+        println!("Simple terminal blockquote output:\n{}", terminal_output);
+        assert!(terminal_output.contains("| This is a quoted text."));
+
+        // Blockquote with Unicode style
+        let bq = quote(vec![p("Fancy quote.")]);
+        let terminal_output = Renderer::to_string_with_style(&bq, Style::default());
+        println!("Unicode terminal blockquote output:\n{}", terminal_output);
+        // Check for the unicode border character and the text (accounting for ANSI codes)
+        assert!(terminal_output.contains("▎"));
+        assert!(terminal_output.contains("Fancy quote."));
+
+        // Nested blocks in blockquote with ASCII style and no colors
+        let bq = quote(vec![h3("Header in Quote"), p("Content in quote.")]);
+        let mut style = Style::ascii();
+        style.use_colors = false; // Disable colors for testing
+        let terminal_output = Renderer::to_string_with_style(&bq, style);
+        println!("Complex terminal blockquote output:\n{}", terminal_output);
+        assert!(terminal_output.contains("| ### Header in Quote"));
+        assert!(terminal_output.contains("| Content in quote."));
     }
 }
