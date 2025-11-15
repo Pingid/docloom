@@ -140,18 +140,7 @@ where
         Block::Paragraph(vec![value.into()])
     }
 }
-
-impl ToVec<Block> for Block {
-    fn to_vec(self) -> Vec<Block> {
-        vec![self]
-    }
-}
-
-impl<'a> ToVec<Block> for &'a Block {
-    fn to_vec(self) -> Vec<Block> {
-        vec![self.clone()]
-    }
-}
+crate::impl_to_vec!(Block, Block, 'a Block, Inline, 'a Inline, 'a str, String, 'a String, usize, bool, f32, f64);
 
 // ---------------- Inline Trait impls ----------------
 impl<T> From<T> for Inline
@@ -162,24 +151,7 @@ where
         Inline::Text(value.to_string())
     }
 }
-
-impl ToVec<Inline> for Inline {
-    fn to_vec(self) -> Vec<Inline> {
-        vec![self]
-    }
-}
-
-impl<'a> ToVec<Inline> for &'a str {
-    fn to_vec(self) -> Vec<Inline> {
-        vec![Inline::from(self)]
-    }
-}
-
-impl ToVec<Inline> for String {
-    fn to_vec(self) -> Vec<Inline> {
-        vec![Inline::from(self)]
-    }
-}
+crate::impl_to_vec!(Inline, Inline, 'a Inline, 'a str, String, 'a String, usize, bool, f32, f64);
 
 // ---------------- Extension Traits ----------------
 
