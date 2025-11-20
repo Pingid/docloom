@@ -6,52 +6,54 @@ A Rust library for programmatically building and rendering documents to markdown
 
 ```toml
 [dependencies]
-docloom = "0.1.0"
+docloom = "0.0.1"
 ```
 
 ## Usage
 
 ```rust
-use docloom::{md, term};
 use docloom::prelude::*;
+use docloom::{md, term};
 
-let content = vec![
-     h1("Docloom Overview"),
-     p((bold("Docloom"), " turns structured blocks into Markdown.")),
-     h2("Getting Started"),
-     p((
-         "Compose ",
-         italic("inline styles"),
-         " and render them together.",
-     )),
-     code_block("rust", "fn main() { println!(\"hello\"); }"),
-     h2("Lists"),
-     ul(["Supports bullet lists", "And numbered ones"]),
-     ol(["Call `doc`", "Render the output"]),
-     task_list([
-         (true, p("Choose block types")),
-         (false, p("Render to more targets")),
-     ]),
-     h2("Tables"),
-     table(
-         ("Feature", "Description"),
-         (
-             ("Tables", "Markdown alignment helpers"),
-             ("Task lists", "Checkbox formatting"),
-         ),
-     ),
-     h2("Quotes"),
-     quote(p("Render nested content with ease.")),
-     hr(),
-     p("Generate complete documents without manual Markdown stitching."),
- ];
+let blocks = [
+    h1("Docloom Overview"),
+    p((bold("Docloom"), " turns structured blocks into Markdown.")),
+    h2("Getting Started"),
+    p((
+        "Compose ",
+        italic("inline styles"),
+        " and render them together.",
+    )),
+    code_block("rust", "fn main() { println!(\"hello\"); }"),
+    h2("Lists"),
+    ul(["Supports bullet lists", "And numbered ones"]),
+    ol(["Call `doc`", "Render the output"]),
+    task_list([
+        (true, p("Choose block types")),
+        (false, p("Render to more targets")),
+    ]),
+    h2("Tables"),
+    table(
+        ("Feature", "Description"),
+        (
+            ("Tables", "Markdown alignment helpers"),
+            ("Task lists", "Checkbox formatting"),
+        ),
+    ),
+    h2("Quotes"),
+    quote(p("Render nested content with ease.")),
+    hr(),
+    p("Generate complete documents without manual Markdown stitching."),
+];
 
-// Render to markdown
-println!("{}", md::doc(&doc));
+let markdown = md::doc(&blocks).to_string();
+let terminal = term::doc(&blocks).to_string();
 
-// Render to terminal with colors
-println!("{}", term::doc(&doc));
+println!("{markdown}");
+println!("{terminal}");
 ```
+
+Apply renderer-specific styling with `.with_style(...)` before calling `.to_string()`.
 
 ## Document Structure
 
@@ -65,6 +67,7 @@ Documents are built from `Block` and `Inline` elements.
 - `List { ordered, items }` - Ordered/unordered lists
 - `TaskList { items }` - Checkbox lists
 - `Table { headers, rows, alignments }` - Tables with alignment
+- `Image { alt, url }` - Standalone image blocks
 - `Blockquote(Vec<Block>)` - Quoted blocks
 - `HorizontalRule` - Horizontal divider
 - `BlockList(Vec<Block>)` - Container for multiple blocks
@@ -77,6 +80,7 @@ Documents are built from `Block` and `Inline` elements.
 - `Strikethrough(Vec<Inline>)` - ~~Strikethrough~~ formatting
 - `Code(String)` - `Inline code`
 - `Link { text, url }` - Hyperlinks
+- `Image { alt, url }` - Inline images
 - `LineBreak` - Line break
 
 ## Builder Functions
@@ -84,14 +88,17 @@ Documents are built from `Block` and `Inline` elements.
 ### Block Builders
 
 ```rust
+use docloom::prelude::*;
+use docloom::Alignment;
+
 // Headers
 h1("Title")
 h2("Subtitle")  // ... through h6
 
 // Content
 p("Paragraph text")
-code_block(Some("rust".into()), "code here")
-quote([p("Quoted text")])
+code_block("rust", "code here")
+quote(p("Quoted text"))
 hr()  // horizontal rule
 
 // Lists
@@ -111,6 +118,8 @@ table_aligned(
 ### Inline Builders
 
 ```rust
+use docloom::prelude::*;
+
 text("plain text")
 bold("bold text")
 italic("italic text")
@@ -124,6 +133,8 @@ link("text", "https://example.com")
 Use method syntax with `BlockExt` and `InlineExt`:
 
 ```rust
+use docloom::prelude::*;
+
 "Title".h1()
 "Paragraph".p()
 "text".bold()
@@ -138,7 +149,7 @@ Use method syntax with `BlockExt` and `InlineExt`:
 Outputs standard markdown with configurable styles:
 
 ````rust
-use docloom::markdown::{Renderer, Style, FenceStyle, ListMarker};
+use docloom::md::{FenceStyle, ListMarker, Renderer, Style};
 
 let style = Style {
     code_fence: FenceStyle::Backtick,  // ``` or ~~~
@@ -146,7 +157,8 @@ let style = Style {
     max_heading: 6,                     // Clamp heading levels
 };
 
-let output = Renderer::to_string_with_style(&doc, style);
+// Reuse the `blocks` definition from the usage example above.
+let output = Renderer::to_string_with_style(&blocks, style);
 ````
 
 ### Terminal Renderer
@@ -154,16 +166,25 @@ let output = Renderer::to_string_with_style(&doc, style);
 Outputs styled terminal output with ANSI codes:
 
 ```rust
-use docloom::terminal::{Renderer, Style};
+use docloom::term::{Renderer, Style};
 
-// Default: colors and unicode
-let output = Renderer::to_string(&doc);
+// Reuse the `blocks` definition from the usage example above.
+let ansi = Renderer::to_string(&blocks);
 
-// Plain text (no colors)
-let plain = Renderer::to_string_with_style(&doc, Style::plain());
+let style = Style::plain()
+    .unicode_boxes(false)
+    .colors(false)
+    .heading_colors([
+        Style::BRIGHT_CYAN,
+        Style::CYAN,
+        Style::BRIGHT_BLUE,
+        Style::BLUE,
+        Style::BRIGHT_WHITE,
+        Style::BRIGHT_WHITE,
+    ]);
 
-// ASCII-only (no unicode)
-let ascii = Renderer::to_string_with_style(&doc, Style::ascii());
+let plain = Renderer::to_string_with_style(&blocks, style);
+let ascii = Renderer::to_string_with_style(&blocks, Style::ascii());
 ```
 
 Terminal features:
