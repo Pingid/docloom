@@ -1,12 +1,23 @@
 # docloom
 
+[![CI](https://github.com/Pingid/docloom/workflows/Check/badge.svg)](https://github.com/Pingid/docloom/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/docloom.svg)](https://crates.io/crates/docloom)
+[![Documentation](https://docs.rs/docloom/badge.svg)](https://docs.rs/docloom)
+[![License](https://img.shields.io/crates/l/docloom.svg)](https://github.com/Pingid/docloom#license)
+
 A Rust library for programmatically building and rendering documents to markdown and styled terminal output.
 
-## Installation
+## Install
+
+```bash
+cargo add docloom
+```
+
+Or add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-docloom = "0.0.1"
+docloom = "0.1"
 ```
 
 ## Usage
@@ -230,6 +241,6 @@ impl<W: fmt::Write> Render for MyRenderer<W> {
 }
 ```
 
-## License
+## 📄 License
 
-MIT
+MIT © [Dan Beaven](https://github.com/Pingid)
