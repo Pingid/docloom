@@ -1,9 +1,12 @@
 [package]
 name = "docloom"
-version = "0.0.1"
+version = "0.1.0"
 edition = "2024"
 description = "Programmatically compose documents and render them to Markdown or styled terminal output."
 license = "MIT"
 homepage = "https://github.com/Pingid/docloom"
 repository = "https://github.com/Pingid/docloom"
 documentation = "https://github.com/Pingid/docloom#readme"
+
+[dependencies]
+itemize = "0.1.0"

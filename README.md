@@ -46,8 +46,8 @@ let blocks = [
     p("Generate complete documents without manual Markdown stitching."),
 ];
 
-let markdown = md::doc(&blocks).to_string();
-let terminal = term::doc(&blocks).to_string();
+let markdown = md::doc(blocks.clone());
+let terminal = term::doc(blocks);
 
 println!("{markdown}");
 println!("{terminal}");

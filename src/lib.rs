@@ -38,14 +38,12 @@
 //!     quote(p("Render nested content with ease.")),
 //!     hr(),
 //!     p("Generate complete documents without manual Markdown stitching."),
-//! ])
-//! .to_string();
-//!
-//! assert!(markdown.contains("Docloom Overview"));
+//! ]);
+//! let content = format!("{markdown}");
+//! assert!(content.contains("Docloom Overview"));
 //! ```
 
 mod build;
-pub(crate) mod into_vec;
 
 pub mod md;
 pub mod term;
@@ -59,7 +57,8 @@ pub mod prelude {
 }
 
 /// Document-level nodes describing paragraphs, lists, and other structural items.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, itemize::IntoItems, itemize::IntoRows)]
+#[items_from(types(Block, Inline), tuples(12), collections(vec, slice, array))]
 pub enum Block {
     /// A paragraph of inline elements.
     Paragraph(Vec<Inline>),
@@ -90,8 +89,18 @@ pub enum Block {
     BlockList(Vec<Block>),
 }
 
+impl<T> From<T> for Block
+where
+    T: Into<Inline>,
+{
+    fn from(value: T) -> Self {
+        Block::Paragraph(vec![value.into()])
+    }
+}
+
 /// Inline elements that compose textual content.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, itemize::IntoItems, itemize::IntoRows)]
+#[items_from(types(&'a str, String, &'a String, usize, bool, f32, f64), tuples(12), collections(vec, slice, array))]
 pub enum Inline {
     /// Plain text.
     Text(String),
@@ -109,6 +118,15 @@ pub enum Inline {
     Image { alt: String, url: String },
     /// A hard line break.
     LineBreak,
+}
+
+impl<T> From<T> for Inline
+where
+    T: std::fmt::Display,
+{
+    fn from(value: T) -> Self {
+        Inline::Text(value.to_string())
+    }
 }
 
 /// Column alignment options used when rendering tables.

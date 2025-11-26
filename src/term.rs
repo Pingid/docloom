@@ -1,6 +1,6 @@
 //! Terminal renderer with ANSI color support.
 //!
-//! The `term` module renders [`crate::Block`] trees into strings that
+//! The `term` module renders [`Block`] trees into strings that
 //! include indentation, Unicode box drawing, and configurable ANSI styling.
 //!
 //! # Examples
@@ -29,10 +29,10 @@
 //! .to_string();
 //! ```
 
+use itemize::IntoItems;
 use std::fmt;
 
-use super::{Block, Inline, Render, Renderable};
-use crate::into_vec::ToVec;
+use super::{Alignment, Block, Inline, Render, Renderable};
 
 /// Terminal document wrapper that renders blocks with terminal [`Style`].
 pub struct Doc {
@@ -42,9 +42,9 @@ pub struct Doc {
 
 impl Doc {
     /// Create a document from values convertible to [`Block`].
-    pub fn new(value: impl ToVec<Block>) -> Self {
+    pub fn new(value: impl IntoItems<Block>) -> Self {
         Self {
-            content: value.to_vec(),
+            content: value.into_items().collect(),
             style: Style::default(),
         }
     }
@@ -64,7 +64,7 @@ impl fmt::Display for Doc {
 }
 
 /// Construct a [`Doc`] from any value that can become a sequence of blocks.
-pub fn doc(value: impl ToVec<Block>) -> Doc {
+pub fn doc(value: impl IntoItems<Block>) -> Doc {
     Doc::new(value)
 }
 
@@ -315,7 +315,7 @@ impl Renderer<'_, String> {
 impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
     type Output = Result<(), fmt::Error>;
 
-    /// Render a [`crate::Block`] as colored terminal output.
+    /// Render a [`Block`] as colored terminal output.
     fn render_block(&mut self, inner: &Block) -> Self::Output {
         use Block::*;
 
@@ -327,6 +327,7 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
             }
 
             Heading { level, content } => {
+                writeln!(self.writer)?;
                 self.write_indent()?;
                 let level_idx = (*level as usize - 1).min(5);
                 let color = self.style.heading_colors[level_idx];
@@ -349,6 +350,7 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
             }
 
             CodeBlock { language, content } => {
+                writeln!(self.writer)?;
                 self.write_indent()?;
 
                 let (top, left, bottom) = if self.style.use_unicode_boxes {
@@ -384,12 +386,11 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                     self.write_indent()?;
                     writeln!(
                         self.writer,
-                        "{}{}{}{}{}{}{}",
+                        "{}{}{}{} {}{}",
                         self.color(Style::DIM),
                         self.color(self.style.border_color),
                         left,
                         self.color(Style::RESET),
-                        " ",
                         self.color(self.style.code_color),
                         line
                     )?;
@@ -411,32 +412,22 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
             List { ordered, items } => {
                 for (idx, item) in items.iter().enumerate() {
                     self.write_indent()?;
-                    if *ordered {
-                        write!(
-                            self.writer,
-                            "{}{}. {}",
-                            self.color(self.style.list_color),
-                            idx + 1,
-                            self.color(Style::RESET)
-                        )?;
-                    } else {
-                        let bullet = if self.style.use_unicode_boxes {
-                            "•"
-                        } else {
-                            "*"
-                        };
-                        write!(
-                            self.writer,
-                            "{}{} {}",
-                            self.color(self.style.list_color),
-                            bullet,
-                            self.color(Style::RESET)
-                        )?;
-                    }
+                    let marker = match (ordered, self.style.use_unicode_boxes) {
+                        (true, _) => format!("{}.", idx + 1),
+                        (false, true) => String::from("•"),
+                        (false, false) => String::from("*"),
+                    };
+                    write!(
+                        self.writer,
+                        "{}{} {}",
+                        self.color(self.style.list_color),
+                        marker,
+                        self.color(Style::RESET)
+                    )?;
 
-                    self.indent_level += 1;
+                    // self.indent_level += 1;
                     item.render_with(self)?;
-                    self.indent_level -= 1;
+                    // self.indent_level -= 1;
                 }
                 writeln!(self.writer)
             }
@@ -460,9 +451,9 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                         self.color(Style::RESET)
                     )?;
 
-                    self.indent_level += 1;
+                    // self.indent_level += 1;
                     item.render_with(self)?;
-                    self.indent_level -= 1;
+                    // self.indent_level -= 1;
                 }
                 writeln!(self.writer)
             }
@@ -529,7 +520,7 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                         self.color(Style::BRIGHT_CYAN)
                     )?;
                     let rendered = Self::to_plain_string(h_cell);
-                    let align = alignments.get(i).copied().unwrap_or(crate::Alignment::Left);
+                    let align = alignments.get(i).copied().unwrap_or(Alignment::Left);
                     let aligned = Self::align_text(&rendered, widths[i], align);
                     write!(self.writer, "{}", aligned)?;
                     write!(
@@ -574,7 +565,7 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                     )?;
                     for (i, w) in widths.iter().enumerate() {
                         write!(self.writer, " ")?;
-                        let align = alignments.get(i).copied().unwrap_or(crate::Alignment::Left);
+                        let align = alignments.get(i).copied().unwrap_or(Alignment::Left);
                         if let Some(cell) = row.get(i) {
                             let rendered = Self::to_plain_string(cell);
                             let aligned = Self::align_text(&rendered, *w, align);
@@ -621,20 +612,12 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                     "|"
                 };
 
-                // Render content to a temporary buffer to get proper rendering
-                let mut content_style = self.style.clone();
-                content_style.use_unicode_boxes = self.style.use_unicode_boxes;
-                content_style.use_colors = self.style.use_colors;
-
                 // Render each block individually with proper indentation
                 for block in inner.iter() {
                     // Render the block to a string first
                     let mut block_content = String::new();
                     self.indent_level += 1;
-                    block.render_with(&mut Renderer::with_style(
-                        &mut block_content,
-                        content_style.clone(),
-                    ))?;
+                    block.render_with(&mut Renderer::with_style(&mut block_content, self.style))?;
                     self.indent_level -= 1;
 
                     // Add the border to each line of the block
@@ -681,7 +664,7 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
         }
     }
 
-    /// Render an [`crate::Inline`] as colored terminal output.
+    /// Render an [`Inline`] as colored terminal output.
     fn render_inline(&mut self, inner: &Inline) -> fmt::Result {
         use Inline::*;
 
@@ -751,20 +734,20 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
 
 // Helper methods
 impl<'a, W: fmt::Write> Renderer<'a, W> {
-    fn align_text(text: &str, width: usize, align: crate::Alignment) -> String {
+    fn align_text(text: &str, width: usize, align: Alignment) -> String {
         let text_len = text.chars().count();
         if text_len >= width {
             text.to_string()
         } else {
             let padding = width - text_len;
             match align {
-                crate::Alignment::Left => format!("{:width$}", text, width = width),
-                crate::Alignment::Center => {
+                Alignment::Left => format!("{:width$}", text, width = width),
+                Alignment::Center => {
                     let left_pad = padding / 2;
                     let right_pad = padding - left_pad;
                     format!("{}{}{}", " ".repeat(left_pad), text, " ".repeat(right_pad))
                 }
-                crate::Alignment::Right => format!("{:>width$}", text, width = width),
+                Alignment::Right => format!("{:>width$}", text, width = width),
             }
         }
     }
@@ -837,7 +820,7 @@ mod tests {
 
     #[test]
     fn test_terminal_table_alignment() {
-        use crate::Alignment;
+        use Alignment;
 
         // Create a table with different alignments
         let table = table_aligned(

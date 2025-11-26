@@ -24,10 +24,10 @@
 //! .to_string();
 //! ```
 
+use itemize::IntoItems;
 use std::fmt;
 
-use super::{Block, Inline, Render, Renderable};
-use crate::{Alignment, into_vec::ToVec};
+use super::{Alignment, Block, Inline, Render, Renderable};
 
 /// Markdown document wrapper that renders blocks with a [`Style`].
 pub struct Doc {
@@ -37,9 +37,9 @@ pub struct Doc {
 
 impl Doc {
     /// Create a new document from items convertible to [`Block`].
-    pub fn new(value: impl ToVec<Block>) -> Self {
+    pub fn new(value: impl IntoItems<Block>) -> Self {
         Self {
-            content: value.to_vec(),
+            content: value.into_items().collect(),
             style: Style::default(),
         }
     }
@@ -59,7 +59,7 @@ impl fmt::Display for Doc {
 }
 
 /// Construct a [`Doc`] from any value that can become a sequence of blocks.
-pub fn doc(value: impl ToVec<Block>) -> Doc {
+pub fn doc(value: impl IntoItems<Block>) -> Doc {
     Doc::new(value)
 }
 
@@ -355,7 +355,7 @@ impl<'a, W: fmt::Write> Render for Renderer<'a, W> {
                 Ok(())
             }
             Image { alt, url } => writeln!(self.writer, "![{alt}]({url})"),
-            LineBreak => write!(self.writer, "  \n"),
+            LineBreak => writeln!(self.writer, "  "),
         }
     }
 }

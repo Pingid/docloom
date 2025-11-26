@@ -1,53 +1,53 @@
 use std::fmt;
 
-use crate::into_vec::{ToRows, ToVec};
 use crate::{Alignment, Block, Inline};
+use itemize::{IntoItems, IntoRows};
 
 /// Wrap multiple blocks into a [`Block::BlockList`].
-pub fn block(value: impl ToVec<Block>) -> Block {
-    Block::BlockList(value.to_vec())
+pub fn block(value: impl IntoItems<Block>) -> Block {
+    Block::BlockList(value.into_items().collect())
 }
 
 /// Create a paragraph block from inline elements.
-pub fn p(value: impl ToVec<Inline>) -> Block {
-    Block::Paragraph(value.to_vec())
+pub fn p(value: impl IntoItems<Inline>) -> Block {
+    Block::Paragraph(value.into_items().collect())
 }
 
 /// Create a heading block at the provided level.
-pub fn h(level: u8, value: impl ToVec<Inline>) -> Block {
+pub fn h(level: u8, value: impl IntoItems<Inline>) -> Block {
     Block::Heading {
         level,
-        content: value.to_vec(),
+        content: value.into_items().collect(),
     }
 }
 
 /// Create a level-one heading block.
-pub fn h1(value: impl ToVec<Inline>) -> Block {
+pub fn h1(value: impl IntoItems<Inline>) -> Block {
     h(1, value)
 }
 
 /// Create a level-two heading block.
-pub fn h2(value: impl ToVec<Inline>) -> Block {
+pub fn h2(value: impl IntoItems<Inline>) -> Block {
     h(2, value)
 }
 
 /// Create a level-three heading block.
-pub fn h3(value: impl ToVec<Inline>) -> Block {
+pub fn h3(value: impl IntoItems<Inline>) -> Block {
     h(3, value)
 }
 
 /// Create a level-four heading block.
-pub fn h4(value: impl ToVec<Inline>) -> Block {
+pub fn h4(value: impl IntoItems<Inline>) -> Block {
     h(4, value)
 }
 
 /// Create a level-five heading block.
-pub fn h5(value: impl ToVec<Inline>) -> Block {
+pub fn h5(value: impl IntoItems<Inline>) -> Block {
     h(5, value)
 }
 
 /// Create a level-six heading block.
-pub fn h6(value: impl ToVec<Inline>) -> Block {
+pub fn h6(value: impl IntoItems<Inline>) -> Block {
     h(6, value)
 }
 
@@ -60,55 +60,64 @@ pub fn code_block(language: impl Into<OptString>, value: impl Into<String>) -> B
 }
 
 /// Create a list block with an explicit ordering flag.
-pub fn list(ordered: bool, items: impl ToVec<Block>) -> Block {
+pub fn list(ordered: bool, items: impl IntoItems<Block>) -> Block {
     Block::List {
         ordered,
-        items: items.to_vec().into(),
+        items: items.into_items().collect(),
     }
 }
 
 /// Create an unordered list block.
-pub fn ul(items: impl ToVec<Block>) -> Block {
+pub fn ul(items: impl IntoItems<Block>) -> Block {
     list(false, items)
 }
 
 /// Create an ordered list block.
-pub fn ol(items: impl ToVec<Block>) -> Block {
+pub fn ol(items: impl IntoItems<Block>) -> Block {
     list(true, items)
 }
 
+#[derive(itemize::IntoItems, itemize::IntoRows)]
+#[items_from(types((bool, Block)), tuples(12), collections(vec, slice, array))]
+pub struct TaskItem(bool, Block);
+
+impl<T> From<(bool, T)> for TaskItem
+where
+    T: Into<Block>,
+{
+    fn from(value: (bool, T)) -> Self {
+        TaskItem(value.0, value.1.into())
+    }
+}
+
 /// Create a task list with checkbox states.
-pub fn task_list(items: impl ToVec<(bool, Block)>) -> Block {
+pub fn task_list(items: impl IntoItems<TaskItem>) -> Block {
     Block::TaskList {
-        items: items
-            .to_vec()
-            .into_iter()
-            .map(|(checked, item)| (checked, item))
-            .collect(),
+        items: items.into_items().map(|item| (item.0, item.1)).collect(),
     }
 }
 
 /// Create a table with left-aligned columns.
-pub fn table(headers: impl ToVec<Inline>, rows: impl ToRows<Inline>) -> Block {
-    let headers: Vec<Inline> = headers.to_vec();
+pub fn table(headers: impl IntoItems<Inline>, rows: impl IntoRows<Inline>) -> Block {
+    let headers: Vec<Inline> = headers.into_items().collect();
     let alignments = vec![Alignment::Left; headers.len()];
     Block::Table {
         headers,
-        rows: rows.to_rows(),
+        rows: rows.into_rows().map(|row| row.collect()).collect(),
         alignments,
     }
 }
 
 /// Create a table with explicit alignments.
 pub fn table_aligned(
-    headers: impl ToVec<Inline>,
-    rows: impl ToRows<Inline>,
+    headers: impl IntoItems<Inline>,
+    rows: impl IntoRows<Inline>,
     alignments: impl Into<Vec<Alignment>>,
 ) -> Block {
     Block::Table {
-        headers: headers.to_vec(),
-        rows: rows.to_rows(),
-        alignments: alignments.into().into(),
+        headers: headers.into_items().collect(),
+        rows: rows.into_rows().map(|row| row.collect()).collect(),
+        alignments: alignments.into(),
     }
 }
 
@@ -118,8 +127,8 @@ pub fn hr() -> Block {
 }
 
 /// Create a blockquote from nested blocks.
-pub fn quote(value: impl ToVec<Block>) -> Block {
-    Block::Blockquote(value.to_vec())
+pub fn quote(value: impl IntoItems<Block>) -> Block {
+    Block::Blockquote(value.into_items().collect())
 }
 
 /// Create a text inline node.
@@ -128,18 +137,18 @@ pub fn text(value: impl fmt::Display) -> Inline {
 }
 
 /// Create a bold inline node.
-pub fn bold(value: impl ToVec<Inline>) -> Inline {
-    Inline::Bold(value.to_vec())
+pub fn bold(value: impl IntoItems<Inline>) -> Inline {
+    Inline::Bold(value.into_items().collect())
 }
 
 /// Create an italic inline node.
-pub fn italic(value: impl ToVec<Inline>) -> Inline {
-    Inline::Italic(value.to_vec())
+pub fn italic(value: impl IntoItems<Inline>) -> Inline {
+    Inline::Italic(value.into_items().collect())
 }
 
 /// Create a strikethrough inline node.
-pub fn strikethrough(value: impl ToVec<Inline>) -> Inline {
-    Inline::Strikethrough(value.to_vec())
+pub fn strikethrough(value: impl IntoItems<Inline>) -> Inline {
+    Inline::Strikethrough(value.into_items().collect())
 }
 
 /// Create an inline code node.
@@ -148,39 +157,15 @@ pub fn code(value: impl Into<String>) -> Inline {
 }
 
 /// Create a hyperlink inline node.
-pub fn link(text: impl ToVec<Inline>, url: impl Into<String>) -> Inline {
+pub fn link(text: impl IntoItems<Inline>, url: impl Into<String>) -> Inline {
     Inline::Link {
-        text: text.to_vec(),
+        text: text.into_items().collect(),
         url: url.into(),
     }
 }
 
-// ---------------- Block Trait impls ----------------
-impl<T> From<T> for Block
-where
-    T: Into<Inline>,
-{
-    fn from(value: T) -> Self {
-        Block::Paragraph(vec![value.into()])
-    }
-}
-crate::impl_to_vec!(Block, Block, 'a Block, Inline, 'a Inline, 'a str, String, 'a String, usize, bool, f32, f64);
-
-// ---------------- Inline Trait impls ----------------
-impl<T> From<T> for Inline
-where
-    T: std::fmt::Display,
-{
-    fn from(value: T) -> Self {
-        Inline::Text(value.to_string())
-    }
-}
-crate::impl_to_vec!(Inline, Inline, 'a Inline, 'a str, String, 'a String, usize, bool, f32, f64);
-
-// ---------------- Extension Traits ----------------
-
 /// Extension trait for creating block elements with method syntax.
-pub trait BlockExt: Sized + ToVec<Inline> {
+pub trait BlockExt: Sized + IntoItems<Inline> {
     /// Convert the value into a level-one heading.
     fn h1(self) -> Block {
         h1(self)
@@ -216,14 +201,14 @@ pub trait BlockExt: Sized + ToVec<Inline> {
         p(self)
     }
 }
-impl<T: ToVec<Inline>> BlockExt for T {}
+impl<T: IntoItems<Inline>> BlockExt for T {}
 
 /// Extension trait for creating inline elements with method syntax.
 pub trait InlineExt: Sized {
     /// Wrap the value in bold emphasis.
     fn bold(self) -> Inline
     where
-        Self: ToVec<Inline>,
+        Self: IntoItems<Inline>,
     {
         bold(self)
     }
@@ -231,7 +216,7 @@ pub trait InlineExt: Sized {
     /// Wrap the value in italic emphasis.
     fn italic(self) -> Inline
     where
-        Self: ToVec<Inline>,
+        Self: IntoItems<Inline>,
     {
         italic(self)
     }
@@ -239,7 +224,7 @@ pub trait InlineExt: Sized {
     /// Wrap the value in strikethrough emphasis.
     fn strikethrough(self) -> Inline
     where
-        Self: ToVec<Inline>,
+        Self: IntoItems<Inline>,
     {
         strikethrough(self)
     }
@@ -247,16 +232,16 @@ pub trait InlineExt: Sized {
     /// Create a hyperlink with the value as link text.
     fn link<S>(self, url: S) -> Inline
     where
-        Self: ToVec<Inline>,
+        Self: IntoItems<Inline>,
         S: Into<String>,
     {
         Inline::Link {
-            text: ToVec::to_vec(self),
+            text: self.into_items().collect(),
             url: url.into(),
         }
     }
 }
-impl<T: ToVec<Inline>> InlineExt for T {}
+impl<T: IntoItems<Inline>> InlineExt for T {}
 
 // ---------------- Helper Types ----------------
 /// Optional string helper used for code block language parameters.
