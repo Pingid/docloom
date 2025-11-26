@@ -97,27 +97,43 @@ pub fn task_list(items: impl IntoItems<TaskItem>) -> Block {
     }
 }
 
-/// Create a table with left-aligned columns.
-pub fn table(headers: impl IntoItems<Inline>, rows: impl IntoRows<Inline>) -> Block {
-    let headers: Vec<Inline> = headers.into_items().collect();
-    let alignments = vec![Alignment::Left; headers.len()];
-    Block::Table {
-        headers,
-        rows: rows.into_rows().map(|row| row.collect()).collect(),
-        alignments,
+#[derive(itemize::IntoItems)]
+#[items_from(types(Inline), tuples(12), collections(vec, slice, array))]
+pub struct Align(Alignment, Inline);
+
+impl Align {
+    pub fn left(inline: impl Into<Inline>) -> Self {
+        Align(Alignment::Left, inline.into())
+    }
+    pub fn center(inline: impl Into<Inline>) -> Self {
+        Align(Alignment::Center, inline.into())
+    }
+    pub fn right(inline: impl Into<Inline>) -> Self {
+        Align(Alignment::Right, inline.into())
     }
 }
 
-/// Create a table with explicit alignments.
-pub fn table_aligned(
-    headers: impl IntoItems<Inline>,
-    rows: impl IntoRows<Inline>,
-    alignments: impl Into<Vec<Alignment>>,
-) -> Block {
+impl<T> From<T> for Align
+where
+    T: Into<Inline>,
+{
+    fn from(value: T) -> Self {
+        Align::left(value)
+    }
+}
+
+/// Create a table with left-aligned columns.
+pub fn table(headers: impl IntoItems<Align>, rows: impl IntoRows<Inline>) -> Block {
+    let mut columns = Vec::new();
+    let mut alignments = Vec::new();
+    for header in headers.into_items() {
+        columns.push(header.1);
+        alignments.push(header.0);
+    }
     Block::Table {
-        headers: headers.into_items().collect(),
+        headers: columns,
         rows: rows.into_rows().map(|row| row.collect()).collect(),
-        alignments: alignments.into(),
+        alignments,
     }
 }
 

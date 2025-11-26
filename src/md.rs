@@ -404,12 +404,13 @@ mod tests {
 
     #[test]
     fn test_markdown_table_with_alignment() {
-        use crate::Alignment;
-
-        let table = table_aligned(
-            ("Name", "Age", "Score"),
+        let table = table(
+            (
+                Align::left("Name"),
+                Align::center("Age"),
+                Align::right("Score"),
+            ),
             (("Alice", "30", "95"), ("Bob", "25", "87")),
-            vec![Alignment::Left, Alignment::Center, Alignment::Right],
         );
         let markdown = Renderer::to_string(&table);
         println!("{markdown}");

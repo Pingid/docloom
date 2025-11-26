@@ -13,13 +13,6 @@ A Rust library for programmatically building and rendering documents to markdown
 cargo add docloom
 ```
 
-Or add to your `Cargo.toml`:
-
-```toml
-[dependencies]
-docloom = "0.1"
-```
-
 ## Usage
 
 ```rust
@@ -100,30 +93,28 @@ Documents are built from `Block` and `Inline` elements.
 
 ```rust
 use docloom::prelude::*;
-use docloom::Alignment;
 
 // Headers
-h1("Title")
-h2("Subtitle")  // ... through h6
+h1("Title");
+h2("Subtitle");  // ... through h6
 
 // Content
-p("Paragraph text")
-code_block("rust", "code here")
-quote(p("Quoted text"))
-hr()  // horizontal rule
+p("Paragraph text");
+code_block("rust", "code here");
+quote(p("Quoted text"));
+hr();  // horizontal rule
 
 // Lists
-ul([p("Item 1"), p("Item 2")])  // unordered
-ol([p("Item 1"), p("Item 2")])  // ordered
-task_list([(true, p("Done")), (false, p("Todo"))])
+ul([p("Item 1"), p("Item 2")]);  // unordered
+ol([p("Item 1"), p("Item 2")]);  // ordered
+task_list([(true, p("Done")), (false, p("Todo"))]);
 
 // Tables
-table(("Col1", "Col2"), [("Row1", "Data")])
-table_aligned(
-    ("Left", "Center", "Right"),
-    [("A", "B", "C")],
-    vec![Alignment::Left, Alignment::Center, Alignment::Right]
-)
+table(("Col1", "Col2"), [("Row1", "Data")]);
+table(
+    (Align::left("Left"), Align::center("Center"), Align::right("Right")),
+    [("A", "B", "C")]
+);
 ```
 
 ### Inline Builders
@@ -131,12 +122,12 @@ table_aligned(
 ```rust
 use docloom::prelude::*;
 
-text("plain text")
-bold("bold text")
-italic("italic text")
-strikethrough("struck text")
-code("inline code")
-link("text", "https://example.com")
+text("plain text");
+bold("bold text");
+italic("italic text");
+strikethrough("struck text");
+code("inline code");
+link("text", "https://example.com");
 ```
 
 ## Extension Traits
@@ -146,11 +137,11 @@ Use method syntax with `BlockExt` and `InlineExt`:
 ```rust
 use docloom::prelude::*;
 
-"Title".h1()
-"Paragraph".p()
-"text".bold()
-"text".italic()
-"link text".link("url")
+"Title".h1();
+"Paragraph".p();
+"text".bold();
+"text".italic();
+"link text".link("url");
 ```
 
 ## Renderers
@@ -160,16 +151,15 @@ use docloom::prelude::*;
 Outputs standard markdown with configurable styles:
 
 ````rust
-use docloom::md::{FenceStyle, ListMarker, Renderer, Style};
+use docloom::md::{FenceStyle, ListMarker, Style, doc};
 
 let style = Style {
-    code_fence: FenceStyle::Backtick,  // ``` or ~~~
-    list_marker: ListMarker::Dash,     // - or *
-    max_heading: 6,                     // Clamp heading levels
+    code_fence: FenceStyle::Tilde,     // ``` or ~~~
+    list_marker: ListMarker::Asterisk, // - or *
+    max_heading: 6,                    // Clamp heading levels
 };
 
-// Reuse the `blocks` definition from the usage example above.
-let output = Renderer::to_string_with_style(&blocks, style);
+let _content = doc([""]).with_style(style);
 ````
 
 ### Terminal Renderer
@@ -177,10 +167,7 @@ let output = Renderer::to_string_with_style(&blocks, style);
 Outputs styled terminal output with ANSI codes:
 
 ```rust
-use docloom::term::{Renderer, Style};
-
-// Reuse the `blocks` definition from the usage example above.
-let ansi = Renderer::to_string(&blocks);
+use docloom::term::{Style, doc};
 
 let style = Style::plain()
     .unicode_boxes(false)
@@ -194,8 +181,8 @@ let style = Style::plain()
         Style::BRIGHT_WHITE,
     ]);
 
-let plain = Renderer::to_string_with_style(&blocks, style);
-let ascii = Renderer::to_string_with_style(&blocks, Style::ascii());
+let _plain = doc([""]).with_style(style);
+let _ascii = doc([""]).with_style(Style::ascii());
 ```
 
 Terminal features:
@@ -210,17 +197,20 @@ Terminal features:
 Build content from tuples for concise syntax:
 
 ```rust
+use docloom::prelude::*;
+
 // Multiple inline elements from tuple
-p(("Hello, ", bold("world"), "!"))
+p(("Hello, ", bold("world"), "!"));
 
 // Table rows from nested tuples
+#[rustfmt::skip]
 table(
-    ("Name", "Age"),
+    ("Name", Align::right("Age")),
     (
         ("Alice", "30"),
         ("Bob", "25"),
     )
-)
+);
 ```
 
 ## Custom Rendering
@@ -228,15 +218,22 @@ table(
 Implement the `Render` trait for custom output formats:
 
 ```rust
-impl<W: fmt::Write> Render for MyRenderer<W> {
+use docloom::{Block, Inline, Render};
+use std::fmt;
+
+struct MyRenderer;
+
+impl Render for MyRenderer {
     type Output = Result<(), fmt::Error>;
 
     fn render_block(&mut self, block: &Block) -> Self::Output {
         // Custom block rendering
+        Ok(())
     }
 
     fn render_inline(&mut self, inline: &Inline) -> Self::Output {
         // Custom inline rendering
+        Ok(())
     }
 }
 ```

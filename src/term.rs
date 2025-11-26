@@ -820,16 +820,17 @@ mod tests {
 
     #[test]
     fn test_terminal_table_alignment() {
-        use Alignment;
-
         // Create a table with different alignments
-        let table = table_aligned(
-            ("Left", "Center", "Right"),
+        let table = table(
+            (
+                Align::left("Left"),
+                Align::center("Center"),
+                Align::right("Right"),
+            ),
             vec![
                 vec![text("A"), text("B"), text("C")],
                 vec![text("Long"), text("Text"), text("Here")],
             ],
-            vec![Alignment::Left, Alignment::Center, Alignment::Right],
         );
 
         let mut style = Style::ascii();

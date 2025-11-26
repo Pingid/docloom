@@ -51,8 +51,8 @@ pub mod term;
 /// Convenience re-exports of builder helpers and extension traits.
 pub mod prelude {
     pub use crate::build::{
-        BlockExt, InlineExt, block, bold, code, code_block, h1, h2, h3, h4, h5, h6, hr, italic,
-        link, ol, p, quote, strikethrough, table, table_aligned, task_list, text, ul,
+        Align, BlockExt, InlineExt, block, bold, code, code_block, h1, h2, h3, h4, h5, h6, hr,
+        italic, link, ol, p, quote, strikethrough, table, task_list, text, ul,
     };
 }
 

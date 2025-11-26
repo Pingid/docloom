@@ -51,13 +51,13 @@ jobs:
           fi
 
       - name: Run tests
-        run: cargo test --workspace --all-features
+        run: cargo test
 
       - name: Build examples
         run: cargo build --examples
 
       - name: Check documentation
-        run: cargo doc --workspace --no-deps
+        run: cargo doc
 
       - name: Publish
         run: cargo publish --token ${{ secrets.CRATES_IO_TOKEN }}
