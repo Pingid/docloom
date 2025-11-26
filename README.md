@@ -1,6 +1,6 @@
 # docloom
 
-[![CI](https://github.com/Pingid/docloom/workflows/Check/badge.svg)](https://github.com/Pingid/docloom/actions/workflows/ci.yml)
+[![CI](https://github.com/Pingid/docloom/workflows/CI/badge.svg)](https://github.com/Pingid/docloom/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/docloom.svg)](https://crates.io/crates/docloom)
 [![Documentation](https://docs.rs/docloom/badge.svg)](https://docs.rs/docloom)
 [![License](https://img.shields.io/crates/l/docloom.svg)](https://github.com/Pingid/docloom#license)
